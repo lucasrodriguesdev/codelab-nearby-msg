@@ -3,6 +3,7 @@ package br.com.nearbymessages
 import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.util.Log
 
 import androidx.recyclerview.widget.LinearLayoutManager
 import br.com.nearbymessages.databinding.ActivityMainBinding
@@ -69,15 +70,18 @@ class MainActivity : AppCompatActivity() {
                 // Called when a new message is found.
                 val msgBody = String(message.content)
                 msgAdapter.addItem(msgBody)
+                Log.i("app-messages-debug","onfound called")
             }
 
             override fun onLost(message: Message) {
                 // Called when a message is no longer detectable nearby.
                 val msgBody = String(message.content)
                 msgAdapter.removeItem(msgBody)
+                Log.i("app-messages-debug","onlost called")
             }
-        }
 
+        }
+        msgAdapter.addItem("Test recycler view add")
         setContentView(binding.root)
     }
 
