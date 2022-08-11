@@ -1,11 +1,14 @@
 package br.com.nearbymessages
 
+import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.os.Message
+
+import androidx.recyclerview.widget.LinearLayoutManager
 import br.com.nearbymessages.databinding.ActivityMainBinding
-import com.google.android.gms.nearby.messages.MessageListener
-import com.google.android.gms.nearby.messages.Strategy
+import com.google.android.gms.nearby.Nearby
+import com.google.android.gms.nearby.messages.*
+import java.nio.charset.Charset
 
 class MainActivity : AppCompatActivity() {
     /**
@@ -42,6 +45,101 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
+        setupMessagesDisplay()
+        binding.subscribeSwitch.setOnCheckedChangeListener { button, isChecked ->
+            if (isChecked){
+                subscribe()
+            } else {
+                unsubscribe()
+            }
+        }
+
+        binding.publishSwitch.setOnCheckedChangeListener { button, isCheked ->
+            if (isCheked){
+                publish()
+            } else {
+                unpublish()
+            }
+        }
+        message = Message(Build.MODEL.toByteArray(Charset.forName("UTF-8")))
+
+
+        messageListener = object : MessageListener() {
+            override fun onFound(message: Message) {
+                // Called when a new message is found.
+                val msgBody = String(message.content)
+                msgAdapter.addItem(msgBody)
+            }
+
+            override fun onLost(message: Message) {
+                // Called when a message is no longer detectable nearby.
+                val msgBody = String(message.content)
+                msgAdapter.removeItem(msgBody)
+            }
+        }
+
         setContentView(binding.root)
+    }
+
+    private fun publish() {
+        val options = PublishOptions.Builder()
+            .setStrategy(PUB_SUB_STRATEGY)
+            .setCallback(object : PublishCallback() {
+                override fun onExpired() {
+                    super.onExpired()
+                    // flick the switch off since the publishing has expired.
+                    // recall that we had set expiration time to 120 seconds
+                    // Use runOnUiThread to force the callback
+                    // to run on the UI thread
+                    runOnUiThread{
+                        binding.publishSwitch.isChecked = false
+                    }
+                }
+            }).build()
+
+        Nearby.getMessagesClient(this).publish(message, options)
+    }
+
+    private fun unpublish() {
+        Nearby.getMessagesClient(this).unpublish(message)
+    }
+
+    private fun subscribe() {
+        Nearby.getMessagesClient(this).unsubscribe(messageListener)
+    }
+
+    private fun unsubscribe() {
+        val options = SubscribeOptions.Builder()
+            .setStrategy(PUB_SUB_STRATEGY)
+            .setCallback(object : SubscribeCallback() {
+                override fun onExpired() {
+                    super.onExpired()
+                    // flick the switch off since the subscribing has expired.
+                    // recall that we had set expiration time to 120 seconds
+                    // Use runOnUiThread to force the callback
+                    // to run on the UI thread
+                    runOnUiThread {
+                        binding.subscribeSwitch.isChecked = false
+                    }
+                }
+            }).build()
+
+        Nearby.getMessagesClient(this).subscribe(messageListener, options)
+    }
+
+    private fun setupMessagesDisplay() {
+        msgAdapter = MessageAdapter()
+        with(binding.nearbyMsgRecyclerView) {
+            layoutManager = LinearLayoutManager(context)
+            this.adapter = msgAdapter
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // although the API should shutdown its processes when the client process dies,
+        // you may want to stop subscribing (and publishing if convenient)
+        Nearby.getMessagesClient(this).unpublish(message)
+        Nearby.getMessagesClient(this).unsubscribe(messageListener)
     }
 }
